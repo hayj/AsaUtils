@@ -36,7 +36,7 @@ def pairwiseCosineSimilarity(data):
 		This function compute the pairwise cosine similary of a vector.
 		n is the dimension of the input vector, n*n is the size of the output matrix.
 	"""
-	return pairwise_distances(data, metric=cosine_similarity, n_jobs=multiprocessing.cpu_count())
+	return 1 - pairwise_distances(data, metric='cosine', n_jobs=multiprocessing.cpu_count())
 
 
 def test1():

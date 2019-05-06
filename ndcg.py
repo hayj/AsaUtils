@@ -1,8 +1,28 @@
 import pandas as pd
-from newssource.metrics.rank_metrics import ndcg_at_k
+from newssource.metrics.rank_metrics import ndcg_at_k, dcg_at_k
 import numpy as np
+from newssource.metrics.utils import *
 
-def pairwiseSimNDCG(simMatrix, labels, logger=None, verbose=True):
+def similarityNDCG(vectors, labels, returnSimMatrix=False, logger=None, verbose=True):
+    """
+        This fonction take vector representation of documents (so a matrix).
+        vectors[0] is the first document and is a vector, for example [1.2, 5.3, -2.4, ..]
+        labels are class identifiers of each dimension.
+        Can be strings, for example the author of an article:
+        ["author1", "author1", "author2", "author3", "author3", "author3", ...]
+        This function return the averaged ndcg score over all column of the
+        cosine similarity matrix of vectors: for a better understanding of this
+        see functions `pairwiseCosineSimilarity` and `pairwiseSimNDCG`.
+        Set returnSimMatrix as True to get both the generated matrix and the score in a tuple.
+    """
+    mtx = pairwiseCosineSimilarity(vectors)
+    score = pairwiseSimNDCG(mtx, labels, logger=logger, verbose=verbose)
+    if returnSimMatrix:
+        return (mtx, score)
+    else:
+        return score
+
+def pairwiseSimNDCG(simMatrix, labels, logger=None, verbose=True, useNNDCG=True):
     """
         This function take a similary matrix n*n (which is a symmetric matrix)
         with 1.0 on the diagonal.
@@ -11,6 +31,10 @@ def pairwiseSimNDCG(simMatrix, labels, logger=None, verbose=True):
         ["author1", "author1", "author2", "author3", "author3", "author3"]
         It returns the nDCG at k (with k = n) averaged over all columns.
     """
+    if useNNDCG:
+        ndcgFunct = nndcg
+    else:
+        ndcgFunct = ndcg
     labels = pd.factorize(labels)[0]
     def rankLabels(col):
         # col = np.array([row[0] + row[1], row[2] + row[3]])
@@ -27,7 +51,7 @@ def pairwiseSimNDCG(simMatrix, labels, logger=None, verbose=True):
         label = labels[x]
         for y in range(len(col)):
             col[y] = col[y] == label
-        nDCGs.append(ndcg(col))
+        nDCGs.append(ndcgFunct(col))
     return np.average(nDCGs)
 
 
@@ -37,3 +61,15 @@ def ndcg(r, method=0):
         This function return the nDCG at k with k = len(r)
     """
     return ndcg_at_k(r, len(r), method=method)
+
+def nndcg(r, method=0):
+    k = len(r)
+    idcg = dcg_at_k(sorted(r, reverse=True), k, method)
+    if not idcg:
+        return 0.
+    wdcg = dcg_at_k(sorted(r, reverse=False), k, method)
+    if not wdcg:
+        return 0.
+    dcg = dcg_at_k(r, k, method)
+    return (dcg - wdcg) / (idcg - wdcg)
+
